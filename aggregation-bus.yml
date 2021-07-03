@@ -1,0 +1,41 @@
+Parameters:
+  OrganizationId:
+    Type: String
+Resources:
+  Bus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: Whodunnit
+  BusPolicy:
+    Type: AWS::Events::EventBusPolicy
+    Properties:
+      EventBusName: !Ref Bus
+      StatementId: AllowOrg
+      Statement:
+        Effect: Allow
+        Principal: "*"
+        Action: events:PutEvents
+        Resource: !GetAtt Bus.Arn
+        Condition:
+          StringEquals:
+            aws:PrincipalOrgID: !Ref OrganizationId
+  Archive:
+    Type: AWS::Events::Archive
+    Properties:
+      SourceArn: !GetAtt Bus.Arn
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/events/whodunnit
+  LogRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: !Ref Bus
+      EventPattern:
+        account: [ { exists: true } ]
+      Targets:
+        - Id: log
+          Arn: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${LogGroup}
+Outputs:
+  Bus:
+    Value: !GetAtt Bus.Arn

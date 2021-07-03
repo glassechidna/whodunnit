@@ -1,0 +1,65 @@
+Parameters:
+  BusArn:
+    Type: String
+Resources:
+  StsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        detail-type: [AWS API Call via CloudTrail]
+        detail:
+          eventSource: [sts.amazonaws.com]
+          eventName:
+            - AssumeRole
+            - AssumeRoleWithWebIdentity
+            - AssumeRoleWithSAML
+            - GetSessionToken
+            - GetFederationToken
+      Targets:
+        - Id: bus
+          Arn: !Ref BusArn
+          RoleArn: !GetAtt Role.Arn
+
+  IamRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        detail-type: [AWS API Call via CloudTrail]
+        detail:
+          eventSource: [iam.amazonaws.com]
+          eventName:
+            - CreateAccessKey
+            - UpdateAccessKey
+            - DeleteAccessKey
+            - UpdateUser
+            - TagUser
+            - UntagUser
+            - TagRole
+            - UntagRole
+            - TagOpenIDConnectProvider
+            - UntagOpenIDConnectProvider
+            - TagSAMLProvider
+            - UntagSAMLProvider
+      Targets:
+        - Id: bus
+          Arn: !Ref BusArn
+          RoleArn: !GetAtt Role.Arn          
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: events.amazonaws.com
+      Policies:
+        - PolicyName: PutEvents
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: events:PutEvents
+                Resource: !Ref BusArn

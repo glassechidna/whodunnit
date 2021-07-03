@@ -1,0 +1,73 @@
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  BusName:
+    Type: String
+    Default: Whodunnit
+
+Globals:
+  Function:
+#    Runtime: provided
+    Runtime: go1.x
+    Handler: bootstrap
+    AutoPublishAlias: live
+    MemorySize: 512
+#    Layers:
+#      - !Sub arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:14
+
+Resources:
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+
+  Lookup:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/lookup/bootstrap
+      Timeout: 15
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
+
+  Writer:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/writer/bootstrap
+      Timeout: 15
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
+      Events:
+        EB:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref BusName
+            Pattern:
+              # account: [ { exists: true } ]
+              detail:
+                eventName:
+                  - prefix: AssumeRole
+
+Outputs:
+  Table:
+    Value: !Ref Table
+  Lookup:
+    Value: !Ref Lookup.Version
+  Writer:
+    Value: !Ref Writer.Version

@@ -1,0 +1,116 @@
+Parameters:
+  OrganizationId:
+    Type: String
+  OrgRootId:
+    Type: String
+Resources:
+  Initial:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-Initial
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+              - sts:SetSourceIdentity
+            Principal:
+              AWS: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: e2e
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                  - sts:TagSession
+                  - sts:SetSourceIdentity
+                Resource: "*"
+      Tags:
+        - Key: initialKey
+          Value: initialValue
+        - Key: overriddenKey
+          Value: dontseeme
+  Secondary:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-Secondary
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref AWS::AccountId
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+              - sts:SetSourceIdentity
+      Policies:
+        - PolicyName: e2e
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                  - sts:TagSession
+                  - sts:SetSourceIdentity
+                Resource: "*"
+      Tags:
+        - Key: secondaryKey
+          Value: secondaryValue
+        - Key: overriddenKey
+          Value: maybeseeme
+  OtherAccounts:
+    Type: AWS::CloudFormation::StackSet
+    Properties:
+      StackSetName: whodunnit-e2e
+      PermissionModel: SERVICE_MANAGED
+      AutoDeployment:
+        Enabled: true
+        RetainStacksOnAccountRemoval: false
+      Capabilities:
+        - CAPABILITY_IAM
+        - CAPABILITY_NAMED_IAM
+      OperationPreferences:
+        MaxConcurrentPercentage: 100
+        RegionConcurrencyType: PARALLEL
+      StackInstancesGroup:
+        - Regions: [us-east-1]
+          DeploymentTargets:
+            OrganizationalUnitIds: [!Ref OrgRootId]
+      TemplateBody: !Sub |
+        Resources:
+          RoleEverywhere:
+            Type: AWS::IAM::Role
+            Properties:
+              RoleName: ${AWS::StackName}-RoleEverywhere
+              AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: Allow
+                    Principal:
+                      AWS: "*"
+                    Action:
+                      - sts:AssumeRole
+                      - sts:TagSession
+                      - sts:SetSourceIdentity
+                    Condition:
+                      StringEquals:
+                        aws:PrincipalOrgId: ${OrganizationId}
+              Policies:
+                - PolicyName: e2e
+                  PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Effect: Allow
+                        Action: sts:AssumeRole
+                        Resource: "*"
+              Tags:
+                - Key: everywhereKey
+                  Value: everywhereValue
+                - Key: accountSpecificKey
+                  Value: !Ref AWS::AccountId
